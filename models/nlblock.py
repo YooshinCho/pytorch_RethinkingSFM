@@ -1,12 +1,4 @@
 from __future__ import absolute_import
-
-'''Resnet for cifar dataset.
-Ported form
-https://github.com/facebook/fb.resnet.torch
-and
-https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
-(c) YANG, Wei
-'''
 import torch
 import torch.nn as nn
 import math
@@ -18,8 +10,8 @@ import matplotlib.pyplot as plt
 __all__ = ['nlblock', 'get_sinusoid_encoding_table']
         
 def save_pic(attention, path):
-  
-  tensor = attention[2].detach()
+  batch_size = attention.size(0)
+  tensor = attention[torch.randint(batch_size,(1,))].detach()
   tensor = tensor.cpu().numpy()
   plt.figure(figsize=(18, 18), frameon=False)
   plt.axis('off')
@@ -58,11 +50,9 @@ def get_sinusoid_encoding_table(n_posX, d_hid, padding_idx=None):
     sinusoid_tableX = np.repeat(sinusoid_tableX, n_posY, axis=2)
     sinusoid_tableY = np.repeat(sinusoid_tableY, n_posX, axis=1)
 
-    #sinusoid_table = sinusoid_tableX + sinusoid_tableY
     sinusoid_table = np.concatenate([sinusoid_tableX ,sinusoid_tableY], axis =0) 
     
     if padding_idx is not None:
-        # zero vector for padding dimension
         sinusoid_table[padding_idx, padding_idx] = 0.
 
     sinusoid_table = np.expand_dims(sinusoid_table, axis=0)
@@ -71,14 +61,14 @@ def get_sinusoid_encoding_table(n_posX, d_hid, padding_idx=None):
 
     
 class attention(nn.Module):
-  def __init__(self,in_dim,args, bias_on = False, num_c = -1,num_head = 1, act = 'softmax', normtype = 'base', pos_enc = 'qk_only'):
+  def __init__(self,in_dim,args, num_c = -1,num_head = 1, act = 'softmax', normtype = 'base', pos_enc = 'add_init'):
         super(attention,self).__init__()
         self.args = args
         self.pos_enc = pos_enc
-        self.theta_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * num_head , kernel_size= 1, bias = bias_on)     
-        self.pi_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * num_head , kernel_size= 1, bias = bias_on)             
-        self.g_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * num_head , kernel_size= 1, bias = bias_on)
-        self.z_conv = nn.Conv2d(in_channels = num_c * num_head , out_channels = in_dim , kernel_size= 1, bias = bias_on)
+        self.theta_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * num_head , kernel_size= 1, bias = False)     
+        self.pi_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * num_head , kernel_size= 1, bias = False)             
+        self.g_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * num_head , kernel_size= 1, bias = False)
+        self.z_conv = nn.Conv2d(in_channels = num_c * num_head , out_channels = in_dim , kernel_size= 1, bias = False)
         
         self.z_bn = nn.BatchNorm2d(num_features=in_dim)
          
@@ -116,55 +106,16 @@ class attention(nn.Module):
         x_theta = x_theta / x_theta.norm(dim=1, keepdim=True) 
         x_pi = x_pi / x_pi.norm(dim=1, keepdim=True) 
 
-      x_theta_mag = x_theta.norm(dim=1, keepdim=True) 
-      x_pi_mag = x_pi.norm(dim=1, keepdim=True) 
-        
-      x_theta_dir = x_theta / x_theta.norm(dim=1, keepdim=True) 
-      x_pi_dir = x_pi / x_pi.norm(dim=1, keepdim=True) 
       
-         
       x_theta = x_theta.view(size_b*self.num_head ,x_theta.size(1),-1)
       x_pi = x_pi.view(size_b*self.num_head,x_pi.size(1),-1)
       x_g = x_g.view(size_b*self.num_head,x_g.size(1),-1)
             
-        
-      
       x_theta = x_theta.permute(0,2,1).contiguous()
       x_g = x_g.permute(0,2,1).contiguous()
        
-        
       attention = torch.bmm(x_theta,x_pi)
-#      attention = attention.div(self.num_c**0.5)
-
-      #####
-
-      print(attention.mean(dim=-1).mean(), attention.var(dim=-2).mean())
-        
          
-      x_theta_mag = x_theta_mag.view(size_b*self.num_head ,x_theta_mag.size(1),-1)
-      x_pi_mag = x_pi_mag.view(size_b*self.num_head,x_pi_mag.size(1),-1)
-            
-        
-      
-      x_theta_mag = x_theta_mag.permute(0,2,1).contiguous()
-       
-        
-      attention = torch.bmm(x_theta_mag,x_pi_mag)
-      print(attention.mean(dim=-1).mean(), attention.std(dim=-1).mean())
-      
-         
-      x_theta_dir = x_theta_dir.view(size_b*self.num_head ,x_theta_dir.size(1),-1)
-      x_pi_dir = x_pi_dir.view(size_b*self.num_head,x_pi_dir.size(1),-1)
-            
-        
-      
-      x_theta_dir = x_theta_dir.permute(0,2,1).contiguous()
-       
-        
-      attention = torch.bmm(x_theta_dir,x_pi_dir)
-      print(attention.mean(dim=-1).mean(), attention.std(dim=-2).mean())
-
-      return
       if self.act != 'none':
         attention = self.f_act(attention)   
       else:
@@ -183,32 +134,22 @@ class attention(nn.Module):
       x_z = x_res + x_z
       return x_z
 
-
-
-
-
-
-
 class attention_T(nn.Module):
-  def __init__(self,in_dim,args, var_scale = True, bias_on = False, num_c = -1,num_head = 1, act = 'softmax', normtype = 'base'):
+  def __init__(self,in_dim,args, var_scale = True, num_c = -1,num_head = 1, act = 'softmax', normtype = 'base'):
         super(attention_T,self).__init__()
         self.args = args
-        self.bias_on = bias_on        
         self.num_c = num_c
         self.num_head = num_head
         self.act = act
         self.normtype = normtype
         self.var_scale = var_scale
-        self.theta_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * self.num_head , kernel_size= 1, bias = self.bias_on)
+        self.theta_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * self.num_head , kernel_size= 1, bias = False)
         
-        self.pi_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * self.num_head , kernel_size= 1, bias = bias_on)             
-        self.g_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * self.num_head , kernel_size= 1, bias = bias_on)
-        self.z_conv = nn.Conv2d(in_channels = num_c * num_head , out_channels = in_dim , kernel_size= 1, bias = bias_on)
+        self.pi_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * self.num_head , kernel_size= 1, bias = False)             
+        self.g_conv = nn.Conv2d(in_channels = in_dim , out_channels = num_c * self.num_head , kernel_size= 1, bias = False)
+        self.z_conv = nn.Conv2d(in_channels = num_c * num_head , out_channels = in_dim , kernel_size= 1, bias = False)
         
         self.z_bn = nn.BatchNorm2d(num_features=in_dim)
-        
-          
-          
         if self.act == 'softmax':
           self.f_act  = nn.Softmax(dim=-1)
           
@@ -241,7 +182,6 @@ class attention_T(nn.Module):
             
       attention = torch.bmm(x_g, x_pi.permute(0,2,1))
       
-              
       if self.act != 'none':
         attention = self.f_act(attention)   
       else:
@@ -262,7 +202,7 @@ class attention_T(nn.Module):
       return x
   
 class nlblock(nn.Module):
-    def __init__(self,in_dim,args,var_scale = True,  bias_on = False,num_c = -1, num_head = 1, pos_enc = 'add_init', cinit=0.01, act = 'softmax', headtype='base', normtype='both', num_block=1):
+    def __init__(self, in_dim, args, var_scale = True, num_c = -1, num_head = 1, pos_enc = 'add_init', cinit=0.01, act = 'softmax', headtype='base', normtype='both', num_block=1):
         super(nlblock,self).__init__()
         self.args = args
         self.pos_enc = pos_enc
@@ -274,6 +214,7 @@ class nlblock(nn.Module):
             num_c = in_dim // 2
           else:
             num_c = in_dim // num_head
+
         self.num_block = num_block
         self.in_dim = in_dim 
         self.var_scale = var_scale
@@ -286,13 +227,11 @@ class nlblock(nn.Module):
         self.cinit = cinit 
         head = []
         for i in range(0, self.num_block):
+            assert headtype == 'base' or headtype == 'T'
             if headtype == 'base':
-              head.append(attention(in_dim, args, bias_on = bias_on, num_c = num_c,num_head=num_head, act = act, normtype= normtype, pos_enc = self.pos_enc))
+              head.append(attention(in_dim, args, num_c=num_c, num_head=num_head, act=act, normtype=normtype, pos_enc = self.pos_enc))
             elif headtype == 'T':
-              head.append(attention_T(in_dim, args, bias_on = bias_on, num_c = num_c, num_head=num_head, act = act, normtype= normtype, var_scale=var_scale))
-            else:
-              print('wrong blocktype')
-              return
+              head.append(attention_T(in_dim, args, num_c=num_c, num_head=num_head, act=act, normtype= normtype, var_scale=var_scale))
         self.head = nn.Sequential(*head)
         
           
@@ -307,6 +246,7 @@ class nlblock(nn.Module):
           print('Conv init with 0.0')
         elif isinstance(m, nn.Conv2d) :
           print('Conv init with He')
+
         if isinstance(m, nn.BatchNorm2d) :
           if m.weight is not None:
             m.weight.data.zero_()
@@ -319,4 +259,4 @@ class nlblock(nn.Module):
       x = self.head(x)  
       return x
     def extra_repr(self):
-        return '{in_dim},num_block = {num_block} num_channels={num_c}, num_heads={num_head}, headtype={headtype}, positional_enc={pos_enc}, init={cinit}, activation={act}, normtype={normtype}, variance scale={var_scale}'.format(**self.__dict__)
+        return 'in_dim={in_dim}, num_block={num_block} num_channels={num_c}, num_heads={num_head}, headtype={headtype}, positional_enc={pos_enc}, init={cinit}, activation={act}, normtype={normtype}, variance scale={var_scale}'.format(**self.__dict__)

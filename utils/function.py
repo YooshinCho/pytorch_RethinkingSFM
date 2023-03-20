@@ -10,7 +10,7 @@ import time
 import sys
 import math
 import torch.utils.data as data
-from ys_utils.tools import *
+from utils.tools import *
 
 
 
@@ -114,6 +114,5 @@ def evaluate_test(testloader, model, criterion, epoch, use_cuda, args):
     print("test acc:%f, %f"%(top1.avg, top5.avg))
     print("test loss:%f"%losses.avg)
   
-    print(100-top1.avg)
     
     return (losses.avg, top1.avg, top5.avg )

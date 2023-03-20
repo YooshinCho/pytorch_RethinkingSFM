@@ -42,7 +42,7 @@ class NetworkBlock(nn.Module):
         for i in range(nb_layers):
             if nl and i == nb_layers-1:
                 print('appended')
-                layers.append(nlblock(i == 0 and in_planes or out_planes, args = args, bias_on = False, num_block=args.num_block2, **args.att_cfg))
+                layers.append(nlblock(i == 0 and in_planes or out_planes, args = args, num_block=args.num_block2, **args.att_cfg))
             layers.append(block(i == 0 and in_planes or out_planes, out_planes, i == 0 and stride or 1, dropRate))
         return nn.Sequential(*layers)
     def forward(self, x):

@@ -1,5 +1,7 @@
 # Rethinking Efficacy of Softmax for Lightweight Non-Local Neural Networks
 
+**[Yooshin Cho](https://scholar.google.com/citations?hl=ko&user=V3oL9esAAAAJ), Youngsoo Kim, [Hanbyel Cho](https://scholar.google.com/citations?user=VvNXbu8AAAAJ&hl=ko), [Jaesung Ahn](https://scholar.google.com/citations?hl=ko&user=dQg6UosAAAAJ), [Hyeong Gwon Hong](https://scholar.google.com/citations?hl=ko&user=uYCWUQwAAAAJ), and [Junmo Kim](https://scholar.google.com/citations?hl=ko&user=GdQtWNQAAAAJ)** | [Paper](https://arxiv.org/abs/2207.13423)
+
 **This is the official repository of "Rethinking Efficacy of Softmax for Lightweight Non-Local Neural Networks", ICIP 2022.**
 
 ## Abstract

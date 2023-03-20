@@ -17,10 +17,9 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import models as models
-import ys_utils.tools as tools
-import ys_utils.ys_function as ys_func
-from ys_utils.logger import Logger
-from tensorboard_logger import configure, log_value
+import utils.tools as tools
+import utils.function as func
+from utils.logger import Logger
 
 
 model_names = sorted(name for name in models.__dict__
@@ -110,16 +109,11 @@ parser.add_argument('--finetune', action='store_true')
 #Device options
 parser.add_argument('--gpu-id', default='0', type=str,
                     help='id(s) for CUDA_VISIBLE_DEVICES')
-parser.add_argument('--tensorboard',
-                    help='Log progress to TensorBoard', action='store_true')
 
 
 args = parser.parse_args()
 state = {k: v for k, v in args._get_kwargs()}
 print(args)
-# Validate dataset
-if args.tensorboard:
-  configure("runs/%s"%(args.logger))
     
 # Use CUDA
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
@@ -156,8 +150,6 @@ def main():
     elif args.dataset == 'cifar100':
         dataloader = datasets.CIFAR100
         num_classes = 100
-    elif args.dataset == 'imagenet':
-        num_classes = 1000
     elif args.dataset == 'tiny-imagenet':
         num_classes = 200    
         
@@ -182,41 +174,6 @@ def main():
       testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers, pin_memory =True)
     
     
-    elif args.dataset == 'imagenet':
-      
-      traindir = os.path.join(args.datadir, 'train')
-      valdir = os.path.join(args.datadir, 'val')
-      
-      
-      normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])
-      transform_train = transforms.Compose([
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                normalize,
-            ])   
-      transform_test = transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                normalize,
-            ])
-            
-            
-      train_dataset = datasets.ImageFolder(
-            traindir,
-            transform_train)
-      test_dataset = datasets.ImageFolder(valdir,               transform_test) 
-      
-      
-      trainloader = torch.utils.data.DataLoader(
-          train_dataset, batch_size=args.train_batch, shuffle=True,
-          num_workers=args.workers, pin_memory=True)
-
-      testloader = torch.utils.data.DataLoader(
-          test_dataset, batch_size=args.test_batch, shuffle=False,
-          num_workers=args.workers, pin_memory=True)                                      
     elif args.dataset == 'tiny-imagenet':
       
       traindir = os.path.join(args.datadir, 'train')
@@ -236,7 +193,6 @@ def main():
                 transforms.ToTensor(),
                 normalize,
             ])
-            
             
       train_dataset = datasets.ImageFolder(
             traindir,
@@ -317,7 +273,7 @@ def main():
 
     if args.evaluate:
         print('\nEvaluation only')
-        ys_func.evaluate_test(testloader, model, criterion, start_epoch,use_cuda, args)
+        func.evaluate_test(testloader, model, criterion, start_epoch,use_cuda, args)
            
         return
     
@@ -326,18 +282,13 @@ def main():
           adjust_learning_rate(optimizer, epoch)
         print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, state['lr']))
         
-        tr_loss,tr_top1,tr_top5 = ys_func.train(trainloader, model, criterion, optimizer, epoch, use_cuda,args, state)
+        tr_loss,tr_top1,tr_top5 = func.train(trainloader, model, criterion, optimizer, epoch, use_cuda,args, state)
         
-        te_loss, te_top1, te_top5 = ys_func.evaluate_test(testloader, model, criterion, epoch, use_cuda, args)
+        te_loss, te_top1, te_top5 = func.evaluate_test(testloader, model, criterion, epoch, use_cuda, args)
         # append logger file
         logger.append([epoch, tr_loss, tr_top1, te_loss, te_top1])
         
         test_acc = te_top1
-        if args.tensorboard:
-          log_value('train_loss', tr_loss, epoch)
-          log_value('train_acc', tr_top1, epoch)
-          log_value('test_loss', te_loss, epoch)
-          log_value('test_acc', te_top1, epoch)
     
         #save model
         is_best = test_acc > best_acc
@@ -350,11 +301,6 @@ def main():
                 'best_acc': best_acc,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, checkpoint=args.checkpoint)
-        
-
-    
-    print('Best acc:')
-    print(100-best_acc)
     logger2.append([100-best_acc])
         
 

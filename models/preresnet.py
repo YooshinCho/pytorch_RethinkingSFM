@@ -1,12 +1,4 @@
 from __future__ import absolute_import
-
-'''Resnet for cifar dataset.
-Ported form
-https://github.com/facebook/fb.resnet.torch
-and
-https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
-(c) YANG, Wei
-'''
 import torch.nn as nn
 import math
 from models.nlblock import *
@@ -103,10 +95,8 @@ class Bottleneck(nn.Module):
         return out
 
 class PreResNet(nn.Module):
-
     def __init__(self,args, depth, num_classes=1000):
         super(PreResNet, self).__init__()
-        # Model type specifies number of layers for CIFAR-10 model
         self.args = args
         
         if args.dataset.startswith('cifar'):
@@ -133,37 +123,6 @@ class PreResNet(nn.Module):
           self.avgpool = nn.AvgPool2d(8)
           self.fc = nn.Linear(64 * block.expansion, num_classes)
           
-  
-        
-              
-        elif args.dataset == 'imagenet':
-          blocks ={18: BasicBlock, 34: BasicBlock, 50: Bottleneck, 101: Bottleneck, 152: Bottleneck, 200: Bottleneck}
-          layers ={18: [2, 2, 2, 2], 34: [3, 4, 6, 3], 50: [3, 4, 6, 3], 101: [3, 4, 23, 3], 152: [3, 8, 36, 3], 200: [3, 24, 36, 3]}
-          assert layers[depth], 'invalid detph for Pre-ResNet (depth should be one of 18, 34, 50, 101, 152, and 200)'
-
-          self.inplanes = 64
-          self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
-          self.bn1 = nn.BatchNorm2d(64)
-          self.relu = nn.ReLU(inplace=True)
-          self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-          
-          self.args.pos_x = 56
-          self.layer1 = self._make_layer(blocks[depth], 64, layers[depth][0], num_block = self.args.num_block1, preact = 'no_preact')
-          
-          
-          self.args.pos_x = 28
-          self.layer2 = self._make_layer(blocks[depth], 128, layers[depth][1], stride=2, num_block = self.args.num_block2)
-          
-          self.args.pos_x = 14
-          self.layer3 = self._make_layer(blocks[depth], 256, layers[depth][2], stride=2, num_block = self.args.num_block3)
-          
-          self.args.pos_x = 7
-          self.layer4 = self._make_layer(blocks[depth], 512, layers[depth][3], stride=2, num_block = self.args.num_block4)
-          
-          self.bn2 = nn.BatchNorm2d(512 * blocks[depth].expansion)
-          self.avgpool = nn.AvgPool2d(7, stride=1) 
-          self.fc = nn.Linear(512 * blocks[depth].expansion, num_classes)
-
           
         elif args.dataset == 'tiny-imagenet':
           blocks ={18: BasicBlock, 34: BasicBlock, 50: Bottleneck, 101: Bottleneck, 152: Bottleneck, 200: Bottleneck}
@@ -201,8 +160,6 @@ class PreResNet(nn.Module):
         for m in self.modules():
             if isinstance(m, nlblock):
               m.reset()
-              
-            
                         
 
     def _make_layer(self, block, planes, blocks, stride=1, num_block=0, preact='no_preact'):
@@ -220,8 +177,7 @@ class PreResNet(nn.Module):
         for i in range(1, blocks):
           if i == blocks-1 and num_block != 0 :
             print('appended')
-            layers.add_module('nonlocal',nlblock(self.inplanes, args = self.args, bias_on = False, num_block = num_block,**self.args.att_cfg)) 
-                            
+            layers.add_module('nonlocal',nlblock(self.inplanes, args = self.args, num_block = num_block,**self.args.att_cfg)) 
           layers.add_module('%d'%(i),block(self.inplanes, planes))
 
         return layers
@@ -238,22 +194,6 @@ class PreResNet(nn.Module):
           x = self.avgpool(x)
           x = x.view(x.size(0), -1)
           x = self.fc(x)
-        elif self.args.dataset == 'imagenet':
-          x = self.conv1(x)
-          x = self.bn1(x)
-          x = self.relu(x)
-          x = self.maxpool(x)
-
-          x = self.layer1(x)
-          x = self.layer2(x)
-          x = self.layer3(x)
-          x = self.layer4(x)
-
-          x = self.bn2(x)
-          x = self.relu(x)
-          x = self.avgpool(x)
-          x = x.view(x.size(0), -1)
-          x = self.fc(x)  
         elif self.args.dataset == 'tiny-imagenet':
           x = self.conv1(x)
           
